@@ -19,18 +19,18 @@ def open_and_edit(path_list):
     commit_message = input("Type the commit message: ")
     for path in path_list:
         try:
-            branch_list = ['master']
+            #Initialize the repo and index based on the .git file in the path
+            repo = Repo.init(path).git
+            index = Repo.init(path).index
+            print("The branches available are: \n" + repo.branch())
+            initial_branch = input("Type the initial branch you want to update: ")
+            branch_list = [initial_branch]
             for branch in branch_list:
-                
-                #Initialize the repo and index based on the .git file in the path
-                repo = Repo.init(path).git
-                index = Repo.init(path).index
                 repo.checkout(branch)
                 repo.pull()
                 j_path = path + "\\Jenkinsfile"
                 
-                string_found = read_and_write(j_path, old_regex, new_regex)
-                            
+                string_found = read_and_write(j_path, old_regex, new_regex)   
                 #Commit and push only if the string we searched for was found in the Jenkinsfile
                 if (string_found & (old_regex != new_regex)):
                     commit_and_push(repo, index, commit_message)
@@ -48,6 +48,10 @@ def open_and_edit(path_list):
             print("Error on directory: " + path)
         except AttributeError as e:
             print(e)
+            print("Error on directory: " + path)
+        except GitCommandError as e:
+            print ("Error with git")
+            print (e)
             print("Error on directory: " + path)
 
 #Read and write the new Jenkinsfile
@@ -78,8 +82,8 @@ def commit_and_push(repo, index, commit_message):
         remote_branch = repo.remote("-v").split("\n")
         push_repository = re.sub("\t", " ", remote_branch[1])
         if (input("Type 'push' in order to push to " + push_repository + " and anything else to skip: ") == "push"):
-            print(repo.push())
-    
+            repo.push()
+            print("-------------------PUSH COMPLETE----------------------")
 
 jenkinsfile_paths = find_jenkinsfile(directory_string)
 open_and_edit(jenkinsfile_paths)
