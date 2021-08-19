@@ -7,9 +7,16 @@ directory_string = input("Enter path of the directories you want to edit: ")
 #Find and return a list with all the directories that have a jenkinsfile in them
 def find_jenkinsfile(path, name = "Jenkinsfile"):
     result = []
-    for root, dirs, files in os.walk(path):
-        if name in files:
-            result.append(os.path.join(root))
+    directory_paths = []
+    #List all the directories in the path argument and put them in a list
+    for dir in os.listdir(path):
+        directory_paths.append(os.path.join(path, dir))
+    #Search recursively for every directory in the directory_paths list for the "name" file
+    for dir in directory_paths:
+        for root, dirs, files in os.walk(dir):
+            if name in files:
+                result.append(os.path.join(root))
+                break #Stop searching in the sub directories when the file is found
     return result
 
 #Open and edit the jenkinsfiles based on two regular expressions that the user enters
@@ -77,6 +84,7 @@ def commit_and_push(repo, index, commit_message):
     print("\n-----------------------------GIT DIFF-----------------------------\n")
     print(repo.diff())
     repo.add("Jenkinsfile") #Add the file to prepare for commit
+
     if (input("Type 'commit' to commit the changes and anything else to skip: ") == "commit"):
         index.commit(commit_message)
         remote_branch = repo.remote("-v").split("\n")
