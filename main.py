@@ -29,61 +29,72 @@ def open_and_edit(path_list):
             #Initialize the repo and index based on the .git file in the path
             repo = Repo.init(path).git
             index = Repo.init(path).index
-            print("The branches available are: \n" + repo.branch())
-            initial_branch = input("Type the initial branch you want to update: ")
-            branch_list = [initial_branch]
-            for branch in branch_list:
-                repo.checkout(branch)
-                repo.pull()
-                j_path = path + "\\Jenkinsfile"
+            j_path = path + "\\Jenkinsfile"
+            jenkinsfile_lines = read_file(j_path)
+            if regex_found(jenkinsfile_lines, old_regex):
+                print("-----------------------------------------------------------------")
+                print("The branches available on project " + path + " are: \n" + repo.branch())
+                print("-----------------------------------------------------------------")
+                initial_branch = input("Type the initial branch you want to update: ")
                 
-                string_found = read_and_write(j_path, old_regex, new_regex)   
-                #Commit and push only if the string we searched for was found in the Jenkinsfile
-                if (string_found & (old_regex != new_regex)):
-                    commit_and_push(repo, index, commit_message)
-                    if branch == branch_list[-1]: #If the current branch you are editing is the last
-                        while (input("The branches available are: \n" + repo.branch() + " \nDo you want to add any additional branches to update? (yes/no): ") == "yes"):
-                            new_branch = input("Enter the name of the new branch: ")
-                            branch_list.append(new_branch)       
-                elif old_regex == new_regex:
-                    print("You entered the same expression twice")
-                else:
-                    print("The expression '" + old_regex + "' was not found in " + j_path)
+                branch_list = [initial_branch]
+                for branch in branch_list:
+                    repo.checkout(branch)
+                    repo.pull()
+                    jenkinsfile_lines = read_file(j_path)
+                    write_file(j_path, jenkinsfile_lines, old_regex, new_regex)
+                    #Commit and push the changes
+                    if (old_regex != new_regex):
+                        commit_and_push(repo, index, commit_message)
+                        if branch == branch_list[-1]: #If the current branch you are editing is the last
+                            while (input("The branches available are: \n" + repo.branch() + " \nDo you want to add any additional branches to update? (yes/no): ") == "yes"):
+                                new_branch = input("Enter the name of the new branch: ")
+                                branch_list.append(new_branch)       
+                    else:
+                        print("You entered the same expression twice")
+        except FileNotFoundError:
+            print(e)
+            print("Error on directory: " + path + "\n -----------------------------------------------------------------")
         except NameError as e:
             print("File not found")
             print(e)
-            print("Error on directory: " + path)
+            print("Error on directory: " + path + "\n -----------------------------------------------------------------")
         except AttributeError as e:
             print(e)
-            print("Error on directory: " + path)
+            print("Error on directory: " + path + "\n -----------------------------------------------------------------")
         except GitCommandError as e:
             print ("Error with git")
             print (e)
-            print("Error on directory: " + path)
+            print("Error on directory: " + path + "\n -----------------------------------------------------------------")
 
-#Read and write the new Jenkinsfile
-#Return True if the file was edited and false if not
-def read_and_write(j_path, old_regex, new_regex):
-    file_edited = False
-    with open(j_path, "r") as file: #Read the Jenkinsfile       
-        jenkinsfile_text = file.readlines() #Table with the Jenkinsfile lines as content
+#Returns True if the regex is foud in the lines list
+def regex_found(lines, old_regex):
+    for x in lines:
+        if (re.search(old_regex, x) != None):
+            return True
+    return False
+
+#Read the file in the path and return a list with the lines it contains
+def read_file(path):
+    with open(path, "r") as file: #Read the Jenkinsfile       
+        jenkinsfile_text = file.readlines() #List with the Jenkinsfile lines as content
+    return jenkinsfile_text
+
+#Open and write the new Jenkinsfile
+def write_file(j_path, jenkinsfile_text, old_regex, new_regex):
     with open(j_path, "w") as file: #Open the Jenkinsfile in non binary write mode
-        string_found = False
         for line in jenkinsfile_text:
-            #Tuple with the new string as first object and the amount of replacements as second
-            replacement_tuple = re.subn(old_regex, new_regex, line)
-            file.write(replacement_tuple[0])
-            if replacement_tuple[1] > 0: #There was a change in the file since at least a line was edited
-                file_edited = True
-    return file_edited
+            line_sub = re.sub(old_regex, new_regex, line) #New string after replacing the regex if it exists
+            file.write(line_sub)
                         
 #Commit and push the changes
 def commit_and_push(repo, index, commit_message):
-    print("\n----------------------------GIT STATUS----------------------------\n")
-    print(repo.status())
     print("\n-----------------------------GIT DIFF-----------------------------\n")
     print(repo.diff())
     repo.add("Jenkinsfile") #Add the file to prepare for commit
+    print("\n----------------------------GIT STATUS----------------------------\n")
+    print(repo.status())
+
 
     if (input("Type 'commit' to commit the changes and anything else to skip: ") == "commit"):
         index.commit(commit_message)
@@ -91,7 +102,7 @@ def commit_and_push(repo, index, commit_message):
         push_repository = re.sub("\t", " ", remote_branch[1])
         if (input("Type 'push' in order to push to " + push_repository + " and anything else to skip: ") == "push"):
             repo.push()
-            print("-------------------PUSH COMPLETE----------------------")
+            print("\n-----------------------------GIT DIFF-----------------------------\n")
 
 jenkinsfile_paths = find_jenkinsfile(directory_string)
 open_and_edit(jenkinsfile_paths)
